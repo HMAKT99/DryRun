@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.2
 - Reports now say *why* the sandbox is unavailable (daemon not reachable vs. image not pulled, with the exact `docker pull`).
 - Removed the unused `productionHints` config option (it was documented but not wired to anything).
 - Docs: install requirements, credentials setup for the MCP server, SECURITY.md, issue/PR templates.

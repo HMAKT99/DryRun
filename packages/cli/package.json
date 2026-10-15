@@ -1,6 +1,6 @@
 {
   "name": "dry-run-agents",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Rehearse any risky agent action before it runs: a flight simulator for AI agents. MCP server + CLI for Claude Code, Codex, Cursor and Gemini CLI.",
   "license": "Apache-2.0",
   "type": "module",

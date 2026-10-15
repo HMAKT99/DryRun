@@ -5,9 +5,9 @@
 ## Context
 Agents can't picture consequences before acting (the April 2026 nine-second prod-DB deletion). Dry Run is a local-first, read-only "rehearse before you act" tool exposed to any coding agent via MCP + CLI. It reports; it never executes (principle 5). A wrong `safe` verdict is treated as a security bug.
 
-Environment findings: `/Users/arun/dryrun` is empty, not a git repo. Node v24.9 and Docker 28.5 present. npm: `dry-run-agents` is **available** (404); `dryrun` is **taken** as a package name, but we only need it as a `bin` name, which is fine.
+Environment findings: The project directory was empty and not a git repo. Node v24.9 and Docker 28.5 present. npm: `dry-run-agents` is **available** (404); `dryrun` is **taken** as a package name, but we only need it as a `bin` name, which is fine.
 
-On approval, first action is to write this as `/Users/arun/dryrun/PLAN.md` (+ `DECISIONS.md`), `git init`, then start Phase 1. Nothing else is built before your go-ahead on the open questions below.
+On approval, first action is to write this as `PLAN.md` (+ `DECISIONS.md`), `git init`, then start Phase 1. Nothing else is built before your go-ahead on the open questions below.
 
 ## Architecture
 - TypeScript strict, Node LTS (22 target; dev on 24), npm workspaces + `tsc -b` project references, `vitest` for tests, ESM only.
