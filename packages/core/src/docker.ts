@@ -8,8 +8,9 @@ import type { Sandbox } from "./types.js";
 export const SANDBOX_IMAGE = process.env.DRYRUN_SANDBOX_IMAGE ?? "alpine/git:latest";
 
 export function dockerAvailable(): boolean {
-  const r = spawnSync("docker", ["info", "--format", "{{.ServerVersion}}"], { timeout: 8000 });
-  return r.status === 0;
+  const r = spawnSync("docker", ["info", "--format", "{{.ServerVersion}}"], { timeout: 8000, encoding: "utf8" });
+  // Some Docker CLI versions exit 0 with EMPTY output when the daemon is unreachable (e.g. a bad DOCKER_HOST): require a real server version.
+  return r.status === 0 && /\d/.test(r.stdout ?? "");
 }
 
 export function imagePresent(image: string = SANDBOX_IMAGE): boolean {
