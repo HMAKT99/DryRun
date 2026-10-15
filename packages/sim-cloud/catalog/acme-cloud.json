@@ -1,0 +1,30 @@
+{
+  "provider": "acme",
+  "title": "Acme Cloud (reference mock provider used by `dryrun demo`)",
+  "catalog_version": 1,
+  "status": "reference",
+  "base_url": "http://127.0.0.1:4010/v1",
+  "auth": { "header": "authorization", "scheme": "Bearer" },
+  "token_introspection": {
+    "get": "/token/self",
+    "extract": { "scopes": "scopes", "scope_type": "type", "projects": "projects", "label": "label" },
+    "broad_if": { "scope_type": ["account", "workspace"], "scopes_include": ["*", "admin"] }
+  },
+  "operations": [
+    {
+      "id": "volumeDelete", "match": { "method": "DELETE", "path": "^/v1/volumes/([^/]+)$", "path_params": ["volumeId"] },
+      "description": "Delete a volume and everything stored on it", "resource": "volume",
+      "destructive": true, "reversibility": "irreversible", "data_bearing": true,
+      "resolve": [
+        { "id": "volume", "get": "/volumes/{volumeId}", "extract": { "name": "name", "bytes": "sizeBytes", "project": "project", "service": "service", "tags": "tags" } },
+        { "id": "backups", "get": "/volumes/{volumeId}/backups", "extract": { "items": "items" }, "backup_location_field": "volumeId" },
+        { "id": "domains", "get": "/services/{service}/domains", "extract": { "domains": "items" }, "needs": ["service"] },
+        { "id": "traffic", "get": "/services/{service}/metrics", "extract": { "rpm": "requestsPerMin" }, "needs": ["service"] }
+      ],
+      "safer": "Snapshot the volume to a different project/region first, or detach it and delete after a retention period. Use a token scoped to this one volume."
+    },
+    { "id": "volumeList", "match": { "method": "GET", "path": "^/v1/volumes$" }, "description": "List volumes", "read_only": true, "destructive": false, "reversibility": "reversible", "data_bearing": false },
+    { "id": "serviceDelete", "match": { "method": "DELETE", "path": "^/v1/services/([^/]+)$", "path_params": ["service"] }, "description": "Delete a service (stops traffic; volumes remain)", "destructive": true, "reversibility": "recoverable", "recovery": "redeploy from source", "data_bearing": false,
+      "resolve": [ { "id": "domains", "get": "/services/{service}/domains", "extract": { "domains": "items" } }, { "id": "traffic", "get": "/services/{service}/metrics", "extract": { "rpm": "requestsPerMin" } } ] }
+  ]
+}

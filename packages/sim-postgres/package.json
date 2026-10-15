@@ -1,0 +1,9 @@
+{
+  "name": "@dryrun/sim-postgres",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": { "@dryrun/core": "0.0.1", "pg": "^8.13.0", "pgsql-ast-parser": "^12.0.1" },
+  "devDependencies": { "@types/pg": "^8.11.0" }
+}

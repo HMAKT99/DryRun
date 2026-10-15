@@ -1,0 +1,24 @@
+{
+  "provider": "aws",
+  "title": "AWS (service:operation)",
+  "catalog_version": 1,
+  "status": "classification-only",
+  "notes": "Tier 1 classification only. Tier 2 target resolution for AWS is not implemented yet: every destructive AWS operation reports the target as unverified and is at least `confirm`.",
+  "operations": [
+    { "id": "ec2:TerminateInstances", "match": { "operation": "ec2:TerminateInstances", "path_params": ["InstanceIds"] }, "description": "Terminate instances (instance-store data and, by default, root volumes are deleted)", "destructive": true, "reversibility": "irreversible", "data_bearing": true },
+    { "id": "ec2:DeleteVolume", "match": { "operation": "ec2:DeleteVolume", "path_params": ["VolumeId"] }, "description": "Delete an EBS volume", "destructive": true, "reversibility": "irreversible", "data_bearing": true, "safer": "aws ec2 create-snapshot --volume-id <id> first, and confirm the snapshot completed." },
+    { "id": "ec2:DeleteSnapshot", "match": { "operation": "ec2:DeleteSnapshot", "path_params": ["SnapshotId"] }, "description": "Delete an EBS snapshot (may be the only backup)", "destructive": true, "reversibility": "irreversible", "data_bearing": true },
+    { "id": "rds:DeleteDBInstance", "match": { "operation": "rds:DeleteDBInstance", "path_params": ["DBInstanceIdentifier"] }, "description": "Delete an RDS instance (automated backups are deleted with it unless retained)", "destructive": true, "reversibility": "irreversible", "data_bearing": true,
+      "reversibility_by_param": { "param": "SkipFinalSnapshot", "when_false": "recoverable", "when_true": "irreversible", "recovery_when_false": "restore from the final snapshot" }, "safer": "Do not pass SkipFinalSnapshot; set FinalDBSnapshotIdentifier and DeleteAutomatedBackups=false." },
+    { "id": "rds:DeleteDBCluster", "match": { "operation": "rds:DeleteDBCluster", "path_params": ["DBClusterIdentifier"] }, "description": "Delete an Aurora/RDS cluster", "destructive": true, "reversibility": "irreversible", "data_bearing": true,
+      "reversibility_by_param": { "param": "SkipFinalSnapshot", "when_false": "recoverable", "when_true": "irreversible", "recovery_when_false": "restore from the final snapshot" } },
+    { "id": "s3:DeleteBucket", "match": { "operation": "s3:DeleteBucket", "path_params": ["Bucket"] }, "description": "Delete a bucket (must be empty; name may be taken by others afterwards)", "destructive": true, "reversibility": "irreversible", "data_bearing": true },
+    { "id": "s3:DeleteObjects", "match": { "operation": "s3:DeleteObjects", "path_params": ["Bucket"] }, "description": "Delete objects (recoverable only if bucket versioning is enabled)", "destructive": true, "reversibility": "irreversible", "data_bearing": true },
+    { "id": "dynamodb:DeleteTable", "match": { "operation": "dynamodb:DeleteTable", "path_params": ["TableName"] }, "description": "Delete a DynamoDB table and its data", "destructive": true, "reversibility": "irreversible", "data_bearing": true },
+    { "id": "cloudformation:DeleteStack", "match": { "operation": "cloudformation:DeleteStack", "path_params": ["StackName"] }, "description": "Delete a stack and every resource it manages", "destructive": true, "reversibility": "irreversible", "data_bearing": true },
+    { "id": "lambda:DeleteFunction", "match": { "operation": "lambda:DeleteFunction", "path_params": ["FunctionName"] }, "description": "Delete a Lambda function", "destructive": true, "reversibility": "recoverable", "recovery": "redeploy from source", "data_bearing": false },
+    { "id": "iam:DeleteUser", "match": { "operation": "iam:DeleteUser", "path_params": ["UserName"] }, "description": "Delete an IAM user (breaks everything using its credentials)", "destructive": true, "reversibility": "recoverable", "recovery": "recreate user and keys", "data_bearing": false },
+    { "id": "ec2:DescribeInstances", "match": { "operation": "ec2:DescribeInstances" }, "description": "List instances", "read_only": true, "destructive": false, "reversibility": "reversible", "data_bearing": false },
+    { "id": "s3:ListBuckets", "match": { "operation": "s3:ListBuckets" }, "description": "List buckets", "read_only": true, "destructive": false, "reversibility": "reversible", "data_bearing": false }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "provider": "railway",
+  "title": "Railway (GraphQL)",
+  "catalog_version": 1,
+  "status": "classification-verified-resolvers-experimental",
+  "notes": "Operation classification is from Railway's public mutation names. Tier 2 resolvers for Railway are not yet verified against the live API; unresolved targets are reported as unverified (never safe).",
+  "base_url": "https://backboard.railway.com/graphql/v2",
+  "auth": { "header": "authorization", "scheme": "Bearer" },
+  "operations": [
+    { "id": "volumeDelete", "match": { "graphql": "volumeDelete", "path_params": ["volumeId"] }, "description": "Delete a volume and its data", "destructive": true, "reversibility": "irreversible", "data_bearing": true, "resource": "volume", "safer": "Create a volume backup first (and verify it is stored outside the volume); use a project-scoped token." },
+    { "id": "serviceDelete", "match": { "graphql": "serviceDelete", "path_params": ["id"] }, "description": "Delete a service", "destructive": true, "reversibility": "recoverable", "recovery": "redeploy from source; attached volumes are separate", "data_bearing": false },
+    { "id": "projectDelete", "match": { "graphql": "projectDelete", "path_params": ["id"] }, "description": "Delete a project including all services, databases and volumes", "destructive": true, "reversibility": "irreversible", "data_bearing": true, "resource": "project", "safer": "Export data and confirm no production services run in this project." },
+    { "id": "environmentDelete", "match": { "graphql": "environmentDelete", "path_params": ["id"] }, "description": "Delete an environment and its resources", "destructive": true, "reversibility": "irreversible", "data_bearing": true, "resource": "environment" },
+    { "id": "variableDelete", "match": { "graphql": "variableDelete" }, "description": "Delete an environment variable", "destructive": true, "reversibility": "recoverable", "recovery": "re-add the variable if its value is known", "data_bearing": false }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "provider": "vercel",
+  "title": "Vercel (REST)",
+  "catalog_version": 1,
+  "status": "classification-verified-resolvers-experimental",
+  "base_url": "https://api.vercel.com",
+  "auth": { "header": "authorization", "scheme": "Bearer" },
+  "token_introspection": { "get": "/v5/user/tokens/current", "extract": { "scopes": "token.scopes", "label": "token.name" }, "broad_if": { "scopes_include": ["*"] } },
+  "operations": [
+    { "id": "projectDelete", "match": { "method": "DELETE", "path": "^/v\\d+/projects/([^/]+)$", "path_params": ["projectId"] }, "description": "Delete a project with its deployments, domains and env vars", "destructive": true, "reversibility": "irreversible", "data_bearing": true, "resource": "project",
+      "resolve": [ { "id": "project", "get": "/v9/projects/{projectId}", "extract": { "name": "name", "domains": "targets.production.alias" } }, { "id": "domains", "get": "/v9/projects/{projectId}/domains", "extract": { "domains": "domains" } } ] },
+    { "id": "deploymentDelete", "match": { "method": "DELETE", "path": "^/v\\d+/deployments/([^/]+)$", "path_params": ["deploymentId"] }, "description": "Delete a deployment", "destructive": true, "reversibility": "recoverable", "recovery": "redeploy the same commit", "data_bearing": false },
+    { "id": "envDelete", "match": { "method": "DELETE", "path": "^/v\\d+/projects/([^/]+)/env/([^/]+)$", "path_params": ["projectId", "envId"] }, "description": "Delete an environment variable", "destructive": true, "reversibility": "recoverable", "recovery": "re-add if the value is known elsewhere", "data_bearing": false },
+    { "id": "domainDelete", "match": { "method": "DELETE", "path": "^/v\\d+/domains/([^/]+)$", "path_params": ["domain"] }, "description": "Remove a domain (traffic to it stops)", "destructive": true, "reversibility": "recoverable", "recovery": "re-add and re-verify the domain", "data_bearing": false },
+    { "id": "storeDelete", "match": { "method": "DELETE", "path": "^/v\\d+/storage/stores/[^/]+/?([^/]*)$", "path_params": ["storeId"] }, "description": "Delete a storage store (Blob/KV/Postgres) and its data", "destructive": true, "reversibility": "irreversible", "data_bearing": true, "resource": "store" }
+  ]
+}

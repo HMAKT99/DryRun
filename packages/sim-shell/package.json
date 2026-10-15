@@ -1,0 +1,9 @@
+{
+  "name": "@dryrun/sim-shell",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": { "@dryrun/core": "0.0.1", "shell-quote": "^1.8.1" },
+  "devDependencies": { "@types/shell-quote": "^1.7.5" }
+}

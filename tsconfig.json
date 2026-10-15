@@ -1,0 +1,35 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/core"
+    },
+    {
+      "path": "packages/sim-shell"
+    },
+    {
+      "path": "packages/sim-postgres"
+    },
+    {
+      "path": "packages/sim-terraform"
+    },
+    {
+      "path": "packages/sim-cloud"
+    },
+    {
+      "path": "packages/sim-saas"
+    },
+    {
+      "path": "packages/demos"
+    },
+    {
+      "path": "packages/engine"
+    },
+    {
+      "path": "packages/mcp"
+    },
+    {
+      "path": "packages/cli"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "@dryrun/sim-saas",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": { "@dryrun/core": "0.0.1" }
+}

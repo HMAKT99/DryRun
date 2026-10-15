@@ -1,0 +1,20 @@
+{
+  "name": "@dryrun/demos",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@dryrun/core": "0.0.1",
+    "@dryrun/sim-shell": "0.0.1",
+    "@dryrun/sim-postgres": "0.0.1",
+    "@dryrun/sim-terraform": "0.0.1",
+    "@dryrun/sim-cloud": "0.0.1",
+    "@dryrun/sim-saas": "0.0.1",
+    "@dryrun/engine": "0.0.1",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.0"
+  }
+}

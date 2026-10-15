@@ -1,0 +1,16 @@
+{
+  "name": "@dryrun/engine",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@dryrun/core": "0.0.1",
+    "@dryrun/sim-shell": "0.0.1",
+    "@dryrun/sim-postgres": "0.0.1",
+    "@dryrun/sim-terraform": "0.0.1",
+    "@dryrun/sim-cloud": "0.0.1",
+    "@dryrun/sim-saas": "0.0.1",
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}

@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run bundle -w dry-run-agents
+      # Tier 3 sandbox tests need these images (the sandbox itself runs with no network).
+      - name: Pull sandbox images
+        run: |
+          docker pull alpine/git:latest
+          docker pull postgres:16-alpine
+      - name: Tests (core, simulators, MCP over stdio, CLI, setup, hardening)
+        run: npm test
+      - name: Demos run end to end and uphold the no-write invariants
+        run: node packages/cli/dist/dryrun.mjs demo all --out "$RUNNER_TEMP/demo-out"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-cards
+          path: ${{ runner.temp }}/demo-out/*.png
+          if-no-files-found: ignore
