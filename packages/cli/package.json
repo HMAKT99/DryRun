@@ -1,16 +1,60 @@
 {
   "name": "dry-run-agents",
   "version": "0.1.0",
-  "description": "Rehearse any risky agent action before it runs: a flight simulator for AI agents.",
+  "description": "Rehearse any risky agent action before it runs: a flight simulator for AI agents. MCP server + CLI for Claude Code, Codex, Cursor and Gemini CLI.",
   "license": "Apache-2.0",
   "type": "module",
-  "bin": { "dryrun": "dist/dryrun.mjs", "dry-run-agents": "dist/dryrun.mjs" },
-  "files": ["dist", "templates"],
-  "engines": { "node": ">=22" },
-  "scripts": { "bundle": "node scripts/bundle.mjs && node scripts/emit-templates.mjs" },
-  "dependencies": { "@resvg/resvg-js": "^2.6.2" },
+  "bin": {
+    "dryrun": "dist/dryrun.mjs",
+    "dry-run-agents": "dist/dryrun.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "bundle": "node scripts/bundle.mjs && node scripts/emit-templates.mjs",
+    "prepublishOnly": "npm run bundle"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  },
   "devDependencies": {
-    "@dryrun/core": "0.0.1", "@dryrun/engine": "0.0.1", "@dryrun/mcp": "0.0.1", "@dryrun/demos": "0.0.1", "@dryrun/sim-cloud": "0.0.1",
-    "commander": "^12.1.0", "esbuild": "^0.24.0"
+    "@dryrun/core": "0.0.1",
+    "@dryrun/engine": "0.0.1",
+    "@dryrun/mcp": "0.0.1",
+    "@dryrun/demos": "0.0.1",
+    "@dryrun/sim-cloud": "0.0.1",
+    "commander": "^12.1.0",
+    "esbuild": "^0.24.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HMAKT99/DryRun.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/HMAKT99/DryRun#readme",
+  "bugs": {
+    "url": "https://github.com/HMAKT99/DryRun/issues"
+  },
+  "keywords": [
+    "mcp",
+    "ai-agents",
+    "claude-code",
+    "codex",
+    "cursor",
+    "gemini-cli",
+    "safety",
+    "dry-run",
+    "guardrails",
+    "model-context-protocol"
+  ],
+  "author": "Arun Kumar Thiagarajan <arunkt.bm14@gmail.com>",
+  "publishConfig": {
+    "access": "public"
   }
 }
