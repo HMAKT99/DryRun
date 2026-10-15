@@ -16,7 +16,7 @@ npx dry-run-agents doctor     # checks Docker, credentials, registration
 npx dry-run-agents demo all   # four showcases, fully local, no accounts needed
 ```
 
-`dry-run-agents` is not yet published to npm. Until it is, build from source: `npm install && npm run build && npm run bundle -w dry-run-agents`, then `node packages/cli/dist/dryrun.mjs setup`.
+Published on npm as [`dry-run-agents`](https://www.npmjs.com/package/dry-run-agents). To build from source instead: `npm install && npm run build && npm run bundle -w dry-run-agents`, then `node packages/cli/dist/dryrun.mjs setup`.
 
 Requires Node 22+. Docker is optional but recommended (it enables Tier 3 sandbox rehearsal). Windows: use WSL2.
 
