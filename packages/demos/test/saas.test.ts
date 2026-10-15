@@ -93,3 +93,26 @@ describe("github", () => {
     for (const q of m.requests) expect(q.method).toBe("GET");
   }, 30_000);
 });
+
+describe("stripe: lookup cap, missing charges and partial failures", () => {
+  it("beyond the lookup cap the total is an extrapolated estimate and says so", async () => {
+    const m = await startStripe(3200); closers.push(m.close);
+    const r = await run({ type: "saas", action: { service: "stripe", operation: "refund", params: { charges: m.charges } }, context: { base_url: m.url, credential_ref: "AGENT_STRIPE" } });
+    const truth = m.charges.reduce((s, id) => s + 2500 + (Number(id.slice(3)) % 40) * 50, 0) / 100;
+    expect(r.evidence.unverified.join(" ")).toMatch(/only 3000 of 3200 charges were looked up/);
+    expect(Math.abs(r.blast_radius.money!.amount - truth) / truth).toBeLessThan(0.02);
+    expect(r.verdict.value).toBe("block");
+  }, 120_000);
+  it("unknown charge ids are reported as unverified, not silently dropped", async () => {
+    const m = await startStripe(50); closers.push(m.close);
+    const r = await run({ type: "saas", action: { service: "stripe", operation: "refund", params: { charges: [...m.charges, "ch_99999", "ch_88888"] } }, context: { base_url: m.url, credential_ref: "AGENT_STRIPE" } });
+    expect(r.evidence.unverified.join(" ")).toMatch(/2 charge id\(s\) could not be looked up/);
+    expect(r.verdict.value).not.toBe("safe");
+  }, 60_000);
+  it("terraform parse errors never echo file contents", async () => {
+    const { createTerraformSimulator } = await import("@dryrun/sim-terraform");
+    const r = await dryRun({ type: "terraform", action: "/etc/hosts" }, [createTerraformSimulator()], { config: defaultConfig() });
+    expect(JSON.stringify(r)).not.toMatch(/localhost|127\.0\.0\.1/);
+    expect(r.verdict.value).toBe("confirm");
+  });
+});

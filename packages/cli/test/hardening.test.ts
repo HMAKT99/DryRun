@@ -91,3 +91,31 @@ describe.skipIf(!createDockerSandbox().available)("sandbox escape review", () =>
     rmSync(proj, { recursive: true, force: true });
   });
 });
+
+describe("scale and concurrency", () => {
+  it("a directory over the limit is rejected quickly without walking everything", () => {
+    const proj = dir();
+    for (let i = 0; i < 300; i++) writeFileSync(join(proj, `f${i}`), "x");
+    const t0 = Date.now();
+    const r = createDockerSandbox().copyProject(proj, { maxFiles: 50 }) as { error?: string };
+    expect(r.error).toMatch(/over 50 files/);
+    expect(Date.now() - t0).toBeLessThan(2000);
+    rmSync(proj, { recursive: true, force: true });
+  });
+  it("reports are saved with a self-ignoring .dryrun/.gitignore", () => {
+    const cwd = dir();
+    cli(["shell", "ls", "--json"], {}, cwd);
+    expect(readFileSync(join(cwd, ".dryrun", ".gitignore"), "utf8")).toBe("*\n");
+    spawnSync("git", ["init", "-q"], { cwd });
+    expect(spawnSync("git", ["status", "--porcelain"], { cwd, encoding: "utf8" }).stdout).not.toContain(".dryrun");
+    rmSync(cwd, { recursive: true, force: true });
+  });
+  it.skipIf(!createDockerSandbox().available)("5 concurrent rehearsals do not interfere or leak containers", async () => {
+    const dirs = Array.from({ length: 5 }, (_, i) => { const d = dir(); writeFileSync(join(d, `only-${i}.txt`), "x"); return d; });
+    const runs = dirs.map((d, i) => new Promise<any>((res) => { const p = spawnSync(process.execPath, [bin, "shell", `rm only-${i}.txt`, "--json"], { cwd: d, encoding: "utf8", env: { ...process.env, NO_COLOR: "1" } }); res(JSON.parse(p.stdout)); }));
+    const reps = await Promise.all(runs);
+    reps.forEach((r, i) => { expect(r.blast_radius.files, `run ${i}`).toBe(1); expect(r.effects.map((e: any) => e.text).join(" ")).toContain("Deletes 1 file"); });
+    for (const [i, d] of dirs.entries()) { expect(existsSync(join(d, `only-${i}.txt`))).toBe(true); rmSync(d, { recursive: true, force: true }); }
+    expect(spawnSync("docker", ["ps", "-a", "--format", "{{.Names}}"]).stdout.toString()).not.toMatch(/dryrun-[0-9a-f]{12}/);
+  }, 120_000);
+});

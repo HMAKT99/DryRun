@@ -92,3 +92,23 @@ describe("CLI exit codes and doctor", () => {
     const r = cli("sql", "DELETE FROM orders", "--json"); expect(r.status).not.toBe(0);
   });
 });
+
+describe("CLI error paths", () => {
+  const cli = (...a: string[]) => spawnSync(process.execPath, [bin, ...a], { encoding: "utf8", env: { ...process.env, NO_COLOR: "1" } });
+  it("bad --params JSON, unknown demo, unknown agent and missing report all fail clearly with exit 1", () => {
+    expect(cli("saas", "stripe", "refund", "--params", "{nope").status).toBe(1);
+    expect(cli("demo", "bogus").status).toBe(1);
+    expect(cli("setup", "--agents", "emacs", "--dry-run").status).toBe(1);
+    const r = cli("explain", "00000000-0000-0000-0000-000000000000"); expect(r.status).toBe(1); expect(r.stderr).toMatch(/No report/);
+    expect(cli("explain", "../../etc/passwd").status).toBe(1);
+  });
+  it("terraform with a real plan file: delete of a prod DB is exit 3; a no-op plan is exit 0", () => {
+    const d = mkdtempSync(join(tmpdir(), "tf-"));
+    writeFileSync(join(d, "bad.json"), JSON.stringify({ resource_changes: [{ address: "aws_db_instance.p", type: "aws_db_instance", change: { actions: ["delete"], before: { identifier: "shop-prod", allocated_storage: 50, skip_final_snapshot: true } } }] }));
+    writeFileSync(join(d, "ok.json"), JSON.stringify({ resource_changes: [{ address: "x", type: "aws_s3_bucket", change: { actions: ["no-op"] } }] }));
+    expect(cli("tf", join(d, "bad.json"), "--cwd", d).status).toBe(3);
+    expect(cli("tf", join(d, "ok.json"), "--cwd", d).status).toBe(0);
+    expect(cli("tf", d, "--cwd", d).status).not.toBe(0); // directory without plan.json
+    rmSync(d, { recursive: true, force: true });
+  });
+});

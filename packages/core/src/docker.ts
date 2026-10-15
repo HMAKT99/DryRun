@@ -64,16 +64,20 @@ export function diffManifests(before: Manifest, after: Manifest): Diff {
   return d;
 }
 
-function measure(dir: string): { bytes: number; files: number } {
-  let bytes = 0, files = 0;
+/** Walks the tree but stops as soon as a limit is exceeded, so a huge directory (e.g. $HOME) cannot hang the check. */
+function measure(dir: string, maxBytes: number, maxFiles: number): { bytes: number; files: number; exceeded?: string } {
+  let bytes = 0, files = 0; let exceeded: string | undefined;
   const walk = (d: string) => {
     for (const n of readdirSync(d)) {
+      if (exceeded) return;
       const p = join(d, n); const st = lstatSync(p);
       if (st.isDirectory()) walk(p); else { files++; bytes += st.size; }
+      if (bytes > maxBytes) exceeded = `project is over ${maxBytes} bytes`;
+      else if (files > maxFiles) exceeded = `project has over ${maxFiles} files`;
     }
   };
-  walk(dir);
-  return { bytes, files };
+  try { walk(dir); } catch (e) { exceeded = `cannot read project: ${(e as Error).message.slice(0, 80)}`; }
+  return { bytes, files, exceeded };
 }
 
 export function createDockerSandbox(): DockerSandbox {
@@ -81,9 +85,8 @@ export function createDockerSandbox(): DockerSandbox {
   return {
     available,
     copyProject(srcDir, limits = {}) {
-      const { bytes, files } = measure(srcDir);
-      if (bytes > (limits.maxBytes ?? 200e6)) return { error: `project is ${bytes} bytes, over the copy limit` };
-      if (files > (limits.maxFiles ?? 50_000)) return { error: `project has ${files} files, over the copy limit` };
+      const m = measure(srcDir, limits.maxBytes ?? 200e6, limits.maxFiles ?? 50_000);
+      if (m.exceeded) return { error: `${m.exceeded} (copy limit); Tier 3 skipped` };
       const dir = mkdtempSync(join(tmpdir(), "dryrun-"));
       cpSync(srcDir, dir, { recursive: true, verbatimSymlinks: true, preserveTimestamps: true });
       const before = manifest(dir);

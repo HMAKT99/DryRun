@@ -3,7 +3,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Action, Finding, Sandbox, Simulator, ReadOnlyContext } from "@dryrun/core";
 import { createDockerSandbox, diffManifests, type DockerSandbox } from "@dryrun/core";
-import { basename, expandPath, isInside, parseCommand, sensitiveReason, type Segment } from "./classify.js";
+import { basename, expandPath, isInside, parseCommand, sensitiveReason, splitGit, type Segment } from "./classify.js";
+import { knownCli } from "./knownCli.js";
 import { analyzePush, parsePush, isGitRepo, recoverableSet, tryGit } from "./gitutil.js";
 
 const SIM = "shell";
@@ -48,8 +49,10 @@ export function createShellSimulator(opts: { sandbox?: DockerSandbox } = {}): Si
       const { segments } = parseCommand(cmdOf(a));
       const out: Finding[] = [];
       for (const s of segments) {
-        if (basename(s.argv[0] ?? "") !== "git" || s.argv[1] !== "push") continue;
-        out.push(...pushFindings(cwd, s.argv.slice(2)));
+        if (basename(s.argv[0] ?? "") !== "git") continue;
+        const g = splitGit(s.argv.slice(1), cwd);
+        if (g.sub !== "push") continue;
+        out.push(...pushFindings(g.cwd, g.rest));
       }
       return out;
     },
@@ -59,9 +62,9 @@ export function createShellSimulator(opts: { sandbox?: DockerSandbox } = {}): Si
       const cmd = cmdOf(a);
       const { segments, dynamic } = parseCommand(cmd);
       const out: Finding[] = [];
-      if (segments.some((s) => basename(s.argv[0] ?? "") === "git" && s.argv[1] === "push")) return out; // never rehearse a push; Tier 2 reads the remote instead
-      const touchesNet = segments.some((s) => ["curl", "wget", "ssh", "scp", "rsync"].includes(basename(s.argv[0] ?? "")) || (basename(s.argv[0] ?? "") === "git" && ["push", "pull", "fetch", "clone"].includes(s.argv[1] ?? "")));
-      const allBenign = segments.every((s) => BENIGN_CMDS.has(basename(s.argv[0] ?? "")) && !s.redirects.some((r) => r.op.startsWith(">")));
+      if (segments.some((s) => basename(s.argv[0] ?? "") === "git" && splitGit(s.argv.slice(1), cwd).sub === "push")) return out; // never rehearse a push; Tier 2 reads the remote instead
+      const touchesNet = segments.some((s) => ["curl", "wget", "ssh", "scp", "rsync"].includes(basename(s.argv[0] ?? "")) || (basename(s.argv[0] ?? "") === "git" && ["push", "pull", "fetch", "clone"].includes(splitGit(s.argv.slice(1), cwd).sub)));
+      const allBenign = segments.every((s) => BENIGN_CMDS.has(basename(s.argv[0] ?? "")) && !writesOrExecs(basename(s.argv[0] ?? ""), s.argv.slice(1)) && !s.redirects.some((r) => r.op.startsWith(">")));
       if (allBenign && !dynamic.length) return out; // nothing to rehearse
       const ds = sandbox as DockerSandbox;
       if (!ds.copyProject) return out;
@@ -180,7 +183,7 @@ function classifySegment(s: Segment, cwd: string): Finding[] {
   const pathCheck = (destructive: boolean, label: string) => {
     for (const p of paths) {
       const abs = expandPath(p, cwd);
-      const why = sensitiveReason(abs);
+      const why = sensitiveReason(abs, cwd);
       const outside = !isInside(abs, cwd);
       const catastrophic = abs === "/" || abs === homedir() || /^\/(etc|usr|bin|sbin|lib|var|boot|System|Library)$/.test(abs);
       if (destructive && catastrophic) out.push(f({ effect: `${label} targets ${why}.`, severity: "critical", reversibility: "irreversible", hardBlock: `${label} of ${why}.`, env: { level: "local", evidence: ["local filesystem"] }, blast: { files: 1 } }, "parser", `${abs}`));
@@ -192,8 +195,17 @@ function classifySegment(s: Segment, cwd: string): Finding[] {
   if (cmd === "rm" || cmd === "rmdir" || cmd === "unlink" || cmd === "shred") {
     pathCheck(true, "Deletion");
     out.push(f({ effect: `${cmd}${hasFlag(/^-[a-zA-Z]*r|--recursive/) ? " (recursive)" : ""}: removes ${paths.length || "?"} path(s) from disk.`, severity: "medium", reversibility: "unknown", unverified: ["pending: exact set of deleted files not yet measured"] }, "parser", src));
-  } else if (["mv", "cp", "ln", "install", "rsync"].includes(cmd)) {
-    pathCheck(true, cmd === "mv" ? "Move" : "Write");
+  } else if (cmd === "mv") {
+    // Only the sources are destroyed by a move; the destination may legitimately be ~ or /tmp.
+    const srcs = paths.slice(0, -1), dest = paths[paths.length - 1];
+    const saved = paths.splice(0, paths.length, ...srcs);
+    void saved; pathCheck(true, "Move");
+    if (dest) { const abs = expandPath(dest, cwd); if (!isInside(abs, cwd)) out.push(f({ effect: `mv writes outside the project: ${abs}; an existing file there would be overwritten.`, severity: "medium", reversibility: "unknown", env: { level: "unknown", evidence: ["destination outside the working directory"] }, unverified: ["overwritten files not measured"] }, "parser", abs)); }
+    out.push(f({ effect: "mv relocates files and may overwrite existing ones.", severity: "low", reversibility: "unknown", unverified: ["pending: overwritten files not yet measured"] }, "parser", src));
+  } else if (["cp", "ln", "install", "rsync"].includes(cmd)) {
+    const dest = paths[paths.length - 1];
+    if (dest) { const abs = expandPath(dest, cwd); if (!isInside(abs, cwd)) out.push(f({ effect: `${cmd} writes outside the project: ${abs}${sensitiveReason(abs, cwd) ? ` (${sensitiveReason(abs, cwd)})` : ""}; existing files there may be overwritten.`, severity: "medium", reversibility: "unknown", env: { level: "unknown", evidence: ["destination outside the working directory"] }, unverified: ["overwritten files not measured"] }, "parser", abs)); }
+    if (cmd === "rsync" && flags.some((x) => /--delete/.test(x))) out.push(f({ effect: "rsync --delete removes files at the destination that are missing from the source.", severity: "high", reversibility: "irreversible", unverified: ["pending: deleted set not yet measured"] }, "parser", src));
     out.push(f({ effect: `${cmd} may overwrite existing files.`, severity: "low", reversibility: "unknown", unverified: ["pending: overwritten files not yet measured"] }, "parser", src));
   } else if (["chmod", "chown", "chgrp", "truncate", "dd", "mkfs", "fdisk", "diskutil", "tee", "touch", "mkdir", "sed", "perl", "awk"].includes(cmd) || cmd.startsWith("mkfs")) {
     const dangerous = ["dd", "mkfs", "fdisk", "diskutil"].includes(cmd) || cmd.startsWith("mkfs");
@@ -207,11 +219,14 @@ function classifySegment(s: Segment, cwd: string): Finding[] {
     out.push(...classifyGit(args, src, cwd));
   } else if (["npm", "pnpm", "yarn", "cargo", "twine", "gem", "docker"].includes(cmd) && /publish|upload|push|unpublish|deprecate/.test(args.join(" "))) {
     out.push(f({ effect: `${cmd} ${args[0] ?? ""} publishes to a public registry; published versions are generally permanent.`, severity: "high", reversibility: "irreversible", env: { level: "production", evidence: ["public registry"] }, unverified: ["package contents/version not inspected"], saferAlternative: `Run \`${cmd} publish --dry-run\` (where supported) and check the file list first.` }, "parser", src));
+  } else if (knownCli(cmd, s.argv)) {
+    const k = knownCli(cmd, s.argv)!;
+    out.push(f({ effect: k.effect, severity: k.severity, reversibility: k.reversibility, saferAlternative: k.saferAlternative, env: { level: "unknown", evidence: ["target environment not inspected by the shell simulator"] }, unverified: ["target of the CLI call not inspected (use the matching dryrun subcommand)"] }, "parser", src));
   } else if (cmd === "curl" || cmd === "wget") {
     out.push(f({ effect: `${cmd} makes a network request${s.pipedToNext ? " piped into another command (possible remote code execution)" : ""}.`, severity: s.pipedToNext ? "high" : "medium", unverified: ["remote response and side effects unknown"] }, "parser", src));
   } else if (["eval", "source", ".", "xargs", "exec", "bash", "sh", "zsh", "node", "python", "python3", "ruby", "perl", "php", "deno", "bun", "make", "npx", "tsx"].includes(cmd) || /^\.?\.?\//.test(cmdRaw)) {
     out.push(f({ effect: `${cmd} runs code whose contents are not analyzed (it may call other commands).`, severity: "medium", reversibility: "unknown", unverified: [`${cmd}: script contents not statically analyzable`] }, "parser", src));
-  } else if (BENIGN_CMDS.has(cmd)) {
+  } else if (BENIGN_CMDS.has(cmd) && !writesOrExecs(cmd, args)) {
     pathCheck(false, cmd);
     out.push(f({ effect: `${cmd}: read-only command.`, benign: true }, "parser", src));
   } else {
@@ -235,15 +250,17 @@ function redirectFindings(s: Segment, cwd: string): Finding[] {
 }
 
 function classifyGit(args: string[], src: string, cwd: string): Finding[] {
-  const sub = args.find((a) => !a.startsWith("-")) ?? "";
-  const rest = args.slice(args.indexOf(sub) + 1);
+  const g = splitGit(args, cwd);
+  const sub = g.sub, rest = g.rest;
   const flags = rest.filter((a) => a.startsWith("-"));
   const out: Finding[] = [];
   const unv = (msg: string) => [msg];
-  void cwd;
-  if (BENIGN_GIT.has(sub) || (sub === "branch" && !flags.some((x) => /^-[a-zA-Z]*[dDmMcCu]|--(delete|move|copy|set-upstream)/.test(x)) && rest.filter((a) => !a.startsWith("-")).length === 0) ||
-      (sub === "remote" && (rest[0] === "-v" || rest.length === 0 || rest[0] === "get-url")) || (sub === "config" && flags.includes("--get")))
+  if (g.configOverrides.length) out.push(f({ effect: `git -c ${g.configOverrides.join(" -c ")} overrides configuration for this call (aliases, pagers, hooks and credential helpers can execute programs).`, severity: "medium", reversibility: "unknown", unverified: unv("git -c config override may run arbitrary programs") }, "parser", src));
+  const writesFile = flags.some((x) => /^--output(=|$)|^-o$/.test(x)) && !["ls-files", "show-ref", "rev-list"].includes(sub) || flags.some((x) => /^--(ext-diff|textconv)$/.test(x));
+  if (!g.configOverrides.length && !writesFile && (BENIGN_GIT.has(sub) || (sub === "branch" && !flags.some((x) => /^-[a-zA-Z]*[dDmMcCu]|--(delete|move|copy|set-upstream)/.test(x)) && rest.filter((a) => !a.startsWith("-")).length === 0) ||
+      (sub === "remote" && (rest[0] === "-v" || rest.length === 0 || rest[0] === "get-url")) || (sub === "config" && flags.includes("--get"))))
     return [f({ effect: `git ${sub}: read-only.`, benign: true }, "parser", src)];
+  if (writesFile) return [f({ effect: `git ${sub} with ${flags.find((x) => /output|ext-diff|textconv/.test(x))} writes a file or runs an external program.`, severity: "medium", reversibility: "unknown", unverified: unv("git output/external-program flag writes or executes") }, "parser", src)];
   switch (sub) {
     case "push": {
       const force = flags.some((x) => x === "--force" || x === "-f" || /^--force-with-lease/.test(x) || /^-[a-zA-Z]*f/.test(x) || x === "--mirror" || x === "--delete" || x === "-d") || rest.some((a) => a.startsWith("+") || a.startsWith(":"));
@@ -263,3 +280,19 @@ function classifyGit(args: string[], src: string, cwd: string): Finding[] {
 
 void statSync; void tryGit; void join;
 export { createDockerSandbox };
+
+/** Read-only-looking commands that nevertheless write files or execute programs with certain flags. */
+function writesOrExecs(cmd: string, args: string[]): boolean {
+  const flags = args.filter((a) => a.startsWith("-")), pos = args.filter((a) => !a.startsWith("-"));
+  switch (cmd) {
+    case "sort": return flags.some((x) => /^(-[a-zA-Z]*o|--output)/.test(x));
+    case "uniq": return pos.length >= 2;
+    case "tree": return flags.some((x) => /^-[a-zA-Z]*o/.test(x));
+    case "rg": case "grep": return flags.some((x) => /^--(pre|hostname-bin|pre-glob)/.test(x));
+    case "hostname": return pos.length > 0 || flags.some((x) => /^-[a-zA-Z]*F|--file/.test(x));
+    case "date": return flags.some((x) => /^(-s|--set)/.test(x)) || (pos.length > 0 && /^\d{8,}/.test(pos[0] ?? "") && !pos[0]!.startsWith("+"));
+    case "less": case "more": return false;
+    case "file": return flags.includes("-C");
+    default: return false;
+  }
+}

@@ -17,15 +17,21 @@ function clean(s: string): string {
 
 function short(v: unknown): string {
   if (Array.isArray(v)) return `[${v.length} item${v.length === 1 ? "" : "s"}]`;
-  if (v && typeof v === "object") return `{${Object.keys(v).join(",")}}`;
-  return String(v);
+  if (v && typeof v === "object") return `{${Object.keys(v).slice(0, 8).join(",")}}`;
+  return scalar(v);
+}
+// Never call String()/template on arbitrary objects: null-prototype or throwing toString() objects would crash the report path.
+function scalar(v: unknown): string {
+  return typeof v === "string" ? v : typeof v === "number" || typeof v === "boolean" || typeof v === "bigint" ? String(v) : v === null || v === undefined ? "" : "(object)";
 }
 export function summarize(a: Action): string {
-  if (typeof a.action === "string") return a.action;
-  const o = a.action as Record<string, unknown>;
-  const head = [o["provider"] ?? o["service"], o["operation"] ?? (o["method"] ? `${o["method"]} ${o["path"]}` : undefined)].filter(Boolean).join(" ");
-  const params = Object.entries((o["params"] as Record<string, unknown>) ?? {}).map(([k, v]) => `${k}=${short(v)}`).join(" ");
-  return (head ? `${head} ${params}` : JSON.stringify(o)).trim();
+  try {
+    if (typeof a.action === "string") return a.action;
+    const o = (a.action ?? {}) as Record<string, unknown>;
+    const head = [o["provider"] ?? o["service"], o["operation"] ?? (o["method"] ? `${scalar(o["method"])} ${scalar(o["path"])}` : undefined)].map(scalar).filter(Boolean).join(" ");
+    const params = o["params"] && typeof o["params"] === "object" ? Object.entries(o["params"] as Record<string, unknown>).slice(0, 12).map(([k, v]) => `${k}=${short(v)}`).join(" ") : "";
+    return (head ? `${head} ${params}` : JSON.stringify(o) ?? "(action)").trim();
+  } catch { return "(unprintable action)"; }
 }
 
 export class ReportValidationError extends Error {}

@@ -33,7 +33,8 @@ export function createEngine(o: EngineOptions = {}): Engine {
   async function run(raw: Action): Promise<ConsequenceReport> {
     const parsed = ActionSchema.safeParse(raw);
     const evidence: Evidence[] = [];
-    const fail = (msg: string, action: Action) => buildReport({
+    const fail = (msg: string, action: Action): ConsequenceReport => { try { return failReport(msg, action); } catch { return failReport(msg, { type: "shell", action: "(unprintable action)" }); } };
+    const failReport = (msg: string, action: Action) => buildReport({
       action, evidence: [{ id: "engine-1", tier: 1, source: "engine", detail: msg }], tierRuns: [{ simulator: "engine", tier: 1, status: "error", note: msg }], matchedSimulators: 0, config,
       findings: [{ simulator: "engine", tier: 1, effect: "Dry Run could not complete the rehearsal.", severity: "medium", reversibility: "unknown", unverified: [msg], evidenceIds: ["engine-1"] }],
     });
@@ -58,7 +59,13 @@ export function createEngine(o: EngineOptions = {}): Engine {
 
   function persist(r: ConsequenceReport): ConsequenceReport {
     if (o.persist === false) return r;
-    try { mkdirSync(reportsDir, { recursive: true }); writeFileSync(join(reportsDir, `${r.id}.json`), JSON.stringify(r, null, 2)); } catch { /* reports are best-effort */ }
+    try {
+      mkdirSync(reportsDir, { recursive: true });
+      // Keep reports out of the user's git status without touching their .gitignore.
+      const ignore = join(cwd, ".dryrun", ".gitignore");
+      if (!existsSync(ignore)) writeFileSync(ignore, "*\n");
+      writeFileSync(join(reportsDir, `${r.id}.json`), JSON.stringify(r, null, 2));
+    } catch { /* reports are best-effort */ }
     return r;
   }
   function loadReport(id: string): ConsequenceReport | undefined {

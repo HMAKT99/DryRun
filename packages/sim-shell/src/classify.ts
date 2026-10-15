@@ -18,6 +18,11 @@ export interface Parsed {
 }
 
 const WRAPPERS = new Set(["sudo", "doas", "env", "nohup", "time", "command", "nice", "exec", "builtin"]);
+// Wrapper flags that consume the next token (so `sudo -u root rm` unwraps to `rm`, not `root`).
+const WRAPPER_ARG_FLAGS: Record<string, string[]> = {
+  sudo: ["-u", "-g", "-h", "-p", "-C", "-D", "-R", "-T", "-U", "-r", "-t"], doas: ["-u", "-C"], nice: ["-n"],
+  env: ["-u", "-C", "-S"], time: ["-f", "-o"], exec: ["-a"],
+};
 const REDIR = new Set([">", ">>", ">|", "<", "<<", "<<<", ">&", "<&", "&>"]);
 
 export function parseCommand(cmd: string, depth = 0): Parsed {
@@ -49,7 +54,8 @@ export function parseCommand(cmd: string, depth = 0): Parsed {
       if (op === "glob") { cur.push((t as { pattern: string }).pattern); continue; }
       if (REDIR.has(op)) {
         const next = tokens[i + 1];
-        redirects.push({ op, target: typeof next === "string" ? next : undefined });
+        const fdDup = (op === ">&" || op === "<&") && typeof next === "string" && /^\d+$|^-$/.test(next);
+        if (!fdDup) redirects.push({ op, target: typeof next === "string" ? next : undefined });
         if (typeof next === "string") i++;
         continue;
       }
@@ -82,8 +88,9 @@ function finish(argv: string[], redirects: Segment["redirects"], piped: boolean)
     const h = a[0];
     if (h && WRAPPERS.has(basename(h))) {
       wrappers.push(basename(h)); a.shift();
-      // skip wrapper flags (e.g. sudo -u root)
-      while (a[0]?.startsWith("-")) a.shift();
+      const takesArg = WRAPPER_ARG_FLAGS[basename(h)] ?? [];
+      while (a[0]?.startsWith("-") && a[0] !== "--") { const fl = a.shift()!; if (takesArg.includes(fl)) a.shift(); }
+      if (a[0] === "--") a.shift();
       continue;
     }
     break;
@@ -106,14 +113,33 @@ export function isInside(path: string, root: string): boolean {
 }
 
 export const SENSITIVE_DIRS = [".ssh", ".aws", ".gnupg", ".config/gcloud", ".kube", ".docker", ".npmrc", ".netrc", ".git-credentials"];
-export function sensitiveReason(abs: string): string | undefined {
+export function sensitiveReason(abs: string, project?: string): string | undefined {
   const home = homedir();
   if (abs === "/") return "the filesystem root";
   if (abs === home) return "your home directory";
   for (const d of SENSITIVE_DIRS) if (isInside(abs, join(home, d))) return `~/${d} (credentials)`;
-  if (/^\/(etc|usr|bin|sbin|lib|var|boot|System|Library|Applications)(\/|$)/.test(abs)) return "a system directory";
+  // Projects legitimately live under /usr/src/app, /var/www, macOS /var/folders...: only flag system dirs OUTSIDE the project.
+  const insideProject = project !== undefined && isInside(abs, project) && project !== "/" && !/^\/(etc|usr|bin|sbin|lib|var|boot|System|Library|Applications)\/?$/.test(project);
+  if (!insideProject && /^\/(etc|usr|bin|sbin|lib|var|boot|System|Library|Applications)(\/|$)/.test(abs)) return "a system directory";
   if (/(^|\/)\.env(\.[\w.-]+)?$/.test(abs)) return "an environment file that may contain secrets";
   if (/(^|\/)(id_rsa|id_ed25519|credentials|\.pem)$|\.pem$|\.p12$|\.key$/.test(abs)) return "a private key / credential file";
   return undefined;
 }
 void sep;
+
+
+export interface GitCall { sub: string; rest: string[]; cwd: string; configOverrides: string[]; flags: string[] }
+/** Splits `git [-C dir] [-c k=v] [--opt] <sub> ...` so global options are never mistaken for the subcommand. */
+export function splitGit(args: string[], cwd: string): GitCall {
+  let dir = cwd; const cfg: string[] = []; const flags: string[] = [];
+  let i = 0;
+  for (; i < args.length; i++) {
+    const a = args[i]!;
+    if (a === "-C") { dir = expandPath(args[++i] ?? ".", dir); continue; }
+    if (a === "-c") { cfg.push(args[++i] ?? ""); continue; }
+    if (a === "--namespace" || a === "--super-prefix" || a === "--config-env") { flags.push(a, args[++i] ?? ""); continue; }
+    if (a.startsWith("-")) { flags.push(a); continue; }
+    break;
+  }
+  return { sub: args[i] ?? "", rest: args.slice(i + 1), cwd: dir, configOverrides: cfg, flags };
+}

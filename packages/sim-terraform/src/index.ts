@@ -39,7 +39,7 @@ function load(a: Action): { plan?: { resource_changes?: RC[] }; error?: string }
   const raw = a.action;
   if (typeof raw === "object") return { plan: raw as never };
   const p = raw.trim();
-  if (p.startsWith("{")) { try { return { plan: JSON.parse(p) }; } catch (e) { return { error: `invalid plan JSON: ${(e as Error).message}` }; } }
+  if (p.startsWith("{")) { try { return { plan: JSON.parse(p) }; } catch (e) { return { error: "invalid plan JSON" }; } }
   const base = a.context?.cwd ?? process.cwd();
   let file = p.startsWith("/") ? p : join(base, p);
   try {
@@ -49,7 +49,7 @@ function load(a: Action): { plan?: { resource_changes?: RC[] }; error?: string }
       file = cand;
     }
     return { plan: JSON.parse(readFileSync(file, "utf8")) };
-  } catch (e) { return { error: `cannot read plan: ${(e as Error).message}` }; }
+  } catch (e) { return { error: (e as NodeJS.ErrnoException).code ? `cannot read plan (${(e as NodeJS.ErrnoException).code})` : "plan file is not valid JSON" }; } // never echo file contents
 }
 
 const prodish = (s: unknown) => typeof s === "string" && /(^|[\s\-_.\/])(prod|production|live|prd)([\s\-_.\/]|$)/i.test(s);

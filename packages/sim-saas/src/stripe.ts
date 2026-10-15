@@ -46,12 +46,14 @@ export async function stripeTier2(r: Req, a: Action, ctx: ReadOnlyContext, env: 
     }
     const cur = Object.keys(byCur).sort((x, y) => byCur[y]! - byCur[x]!)[0] ?? "usd";
     const exact = major(byCur[cur] ?? 0, cur);
-    const extrap = ids.length > sample.length && ok.length ? (exact / Math.max(1, ok.length - already - uncaptured)) * (ids.length - missing) : 0;
+    // Beyond the lookup cap: exact total for what was looked up + (average refundable amount x charges NOT looked up).
+    const counted = ok.length - already - uncaptured;
+    const extrap = ids.length > sample.length && counted > 0 ? (exact / counted) * (ids.length - sample.length) : 0;
     const total = exact + extrap;
     const mode = live && !test ? "live" : test && !live ? "test" : live ? "mixed" : "unknown";
     const unv: string[] = [];
     if (missing) unv.push(`${missing} charge id(s) could not be looked up`);
-    if (ids.length > sample.length) unv.push(`only ${sample.length} of ${ids.length} charges were looked up; the total is extrapolated`);
+    if (ids.length > sample.length) unv.push(`only ${sample.length} of ${ids.length} charges were looked up; the total is extrapolated and the customer count is a lower bound`);
     if (Object.keys(byCur).length > 1) unv.push(`multiple currencies (${Object.keys(byCur).join(", ")}); total shown is for ${cur.toUpperCase()} only`);
     out.push(mk({
       effect: `Would refund ${ok.length - already - uncaptured} charge(s)${ids.length > sample.length ? ` (of ${ids.length}, extrapolated)` : ""}: ${cur.toUpperCase()} ${total.toLocaleString("en-US", { maximumFractionDigits: 2 })} total to ${customers.size} customer(s)${ids.length > sample.length ? " (estimate)" : ""}. Charges are ${mode.toUpperCase()}-mode. ${already ? `${already} already refunded (skipped). ` : ""}Irreversible.`,
