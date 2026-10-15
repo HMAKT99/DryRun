@@ -1,3 +1,5 @@
+> **Historical document.** This is the original planning draft written before the build. It is kept for context; several open questions in it were later decided. See [DECISIONS.md](DECISIONS.md) for what changed and why, and the [README](../README.md) for how things work today.
+
 # Dry Run — PLAN.md (draft for review)
 
 ## Context

@@ -119,3 +119,14 @@ describe("scale and concurrency", () => {
     expect(spawnSync("docker", ["ps", "-a", "--format", "{{.Names}}"]).stdout.toString()).not.toMatch(/dryrun-[0-9a-f]{12}/);
   }, 120_000);
 });
+
+describe("honest sandbox messages", () => {
+  it("a missing sandbox image is reported as such, with the exact fix, not as 'Docker unavailable'", () => {
+    const cwd = dir(); writeFileSync(join(cwd, "a.txt"), "x");
+    const rep = JSON.parse(cli(["shell", "rm a.txt", "--json"], { DRYRUN_SANDBOX_IMAGE: "dryrun-no-such-image:0" }, cwd).stdout);
+    const t3 = rep.evidence.tiers_run.find((t: any) => t.tier === 3);
+    expect(t3.status).toBe("skipped");
+    expect(t3.note).toMatch(/image dryrun-no-such-image:0 is not pulled \(run: docker pull dryrun-no-such-image:0\)/);
+    rmSync(cwd, { recursive: true, force: true });
+  });
+});

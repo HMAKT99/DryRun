@@ -19,6 +19,8 @@ const RAW = "https://raw.githubusercontent.com/HMAKT99/DryRun/main/", BLOB = "ht
 const readme = readFileSync("../../README.md", "utf8")
   .replace(/\]\((docs\/assets\/[^)]+)\)/g, `](${RAW}$1)`)
   .replace(/\]\(((?:docs\/|CONTRIBUTING)[^)]+)\)/g, `](${BLOB}$1)`)
-  .replace(/`dry-run-agents` is not yet published to npm\.[^\n]*\n\n/, "");
+  .replace(/Published on npm as \[`dry-run-agents`\][^\n]*\n\n/, "")
+  .replace(/\]\((LICENSE|SECURITY\.md|CHANGELOG\.md)\)/g, `](${BLOB}$1)`)
+  .replace(/\]\(docs\/DECISIONS\.md\)/g, `](${BLOB}docs/DECISIONS.md)`);
 writeFileSync("README.md", readme);
 copyFileSync("../../LICENSE", "LICENSE");

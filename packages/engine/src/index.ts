@@ -76,11 +76,12 @@ export function createEngine(o: EngineOptions = {}): Engine {
 
   function list(): SimulatorInfo[] {
     const docker = dockerAvailable();
-    const sbNote = docker ? "Docker is running" : "Docker is not available; Tier 3 is skipped and reports say so";
+    const sbReason = createDockerSandbox().reason;
+    const sbNote = docker ? (sbReason ?? "Docker is running") : "Docker is not available; Tier 3 is skipped and reports say so";
     const cats = loadCatalogs();
     const anyRo = (names: string[]) => names.some((n) => env[`DRYRUN_${n.toUpperCase()}_READONLY_TOKEN`]);
     return [
-      { id: "shell", handles: "shell (incl. git)", tiers: [{ tier: 1, available: true, note: "command classification" }, { tier: 2, available: true, note: "git push/force-push: read-only fetch into a throwaway repo" }, { tier: 3, available: docker, note: sbNote }] },
+      { id: "shell", handles: "shell (incl. git)", tiers: [{ tier: 1, available: true, note: "command classification" }, { tier: 2, available: true, note: "git push/force-push: read-only fetch into a throwaway repo" }, { tier: 3, available: docker && !sbReason, note: sbNote }] },
       { id: "postgres", handles: "sql", tiers: [{ tier: 1, available: true, note: "SQL parser" }, { tier: 2, available: !!env["DRYRUN_DATABASE_URL"], note: env["DRYRUN_DATABASE_URL"] ? "read-only URL configured (DRYRUN_DATABASE_URL)" : "pass a read-only URL via context.db_url_ref or set DRYRUN_DATABASE_URL" }, { tier: 3, available: docker, note: sbNote }] },
       { id: "terraform", handles: "terraform", tiers: [{ tier: 1, available: true, note: "parses `terraform show -json` plans (never runs terraform)" }] },
       { id: "cloud", handles: `cloud_api (${cats.map((c) => c.provider).join(", ")})`, tiers: [{ tier: 1, available: true, note: "operation catalog" }, { tier: 2, available: anyRo(cats.map((c) => c.provider)), note: "needs DRYRUN_<PROVIDER>_READONLY_TOKEN; AWS has classification only" }] },

@@ -39,7 +39,7 @@ export async function dryRun(action: Action, simulators: Simulator[], opts: RunO
     await run(2, sim.inspect && opts.readOnly ? () => sim.inspect!(action, opts.readOnly!) : undefined,
       sim.inspect ? "no read-only credentials configured" : undefined);
     await run(3, sim.rehearse && opts.sandbox?.available ? () => sim.rehearse!(action, opts.sandbox!) : undefined,
-      sim.rehearse ? "sandbox (Docker) unavailable" : undefined);
+      sim.rehearse ? (opts.sandbox?.reason ?? "no sandbox configured") : undefined);
   }
   // A simulator throwing at Tier 1 must never yield a report that looks verified.
   return buildReport({ action, findings, evidence, tierRuns, matchedSimulators: matched.length, config });

@@ -120,6 +120,8 @@ export interface ReadOnlyContext {
 
 export interface Sandbox {
   available: boolean;
+  /** Why the sandbox is unavailable (shown in reports). */
+  reason?: string;
 }
 
 export interface Simulator {

@@ -1,5 +1,7 @@
 # Dry Run
 
+[![CI](https://github.com/HMAKT99/DryRun/actions/workflows/ci.yml/badge.svg)](https://github.com/HMAKT99/DryRun/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/dry-run-agents)](https://www.npmjs.com/package/dry-run-agents) [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
 **Rehearse anything before your agent does it.**
 
 Dry Run is a flight simulator for AI agents. Before an agent deletes a volume, drops a table, force-pushes, applies Terraform or refunds 2,000 charges, it calls `dry_run`, sees the consequences, and stops if it should. It works with Claude Code, Codex, Cursor, Gemini CLI and anything else that speaks MCP.
@@ -16,11 +18,22 @@ npx dry-run-agents doctor     # checks Docker, credentials, registration
 npx dry-run-agents demo all   # four showcases, fully local, no accounts needed
 ```
 
-Published on npm as [`dry-run-agents`](https://www.npmjs.com/package/dry-run-agents). To build from source instead: `npm install && npm run build && npm run bundle -w dry-run-agents`, then `node packages/cli/dist/dryrun.mjs setup`.
+Published on npm as [`dry-run-agents`](https://www.npmjs.com/package/dry-run-agents). The examples below use the short command `dryrun`; run it as `npx dry-run-agents <command>`, or install it once with `npm i -g dry-run-agents`. To build from source instead: `npm install && npm run build && npm run bundle -w dry-run-agents`, then `node packages/cli/dist/dryrun.mjs setup`.
 
-Requires Node 22+. Docker is optional but recommended (it enables Tier 3 sandbox rehearsal). Windows: use WSL2.
+**Requirements:** Node 22+. Docker is optional but recommended: it enables Tier 3 sandbox rehearsal. Pull the two images once (no network is used when rehearsing):
+
+```bash
+docker pull alpine/git:latest        # shell / git rehearsal
+docker pull postgres:16-alpine       # SQL rehearsal and the missing-where demo
+```
+
+Without Docker, Dry Run still works at Tier 1 and 2 and says so in every report. `dryrun doctor` tells you what is missing. Tested on macOS and Linux (CI); Windows: use WSL2 (untested).
+
+`setup` registers an MCP server named `dry-run`. Read-only credentials for Tier 2 (database, Stripe, GitHub...) are passed to it through environment variables: see [docs/credentials.md](docs/credentials.md).
 
 ## What you get
+
+Typical findings (paraphrased from real reports):
 
 | The agent is about to… | Dry Run tells it |
 |---|---|
@@ -57,7 +70,7 @@ Dry Run **reports; it never executes.** The agent still runs the real action, af
 
 ### The guarantees, and how they are enforced
 
-1. **It never changes a real system.** The HTTP client Dry Run hands to simulators has only `get` and a GraphQL-*query* method (mutations are rejected before sending). Postgres access goes through a gate that accepts a single `SELECT`/`EXPLAIN`/`SHOW`, in a server-side read-only session; `EXPLAIN ANALYZE` is refused. The untrusted statement is only ever executed inside a disposable, network-less container. Tests run every simulator against mock providers that record every request and fail on any non-GET.
+1. **It never changes a real system.** The HTTP client Dry Run hands to simulators has only `get` and a GraphQL-*query* method (mutations are rejected before sending). Postgres access goes through a gate that accepts a single `SELECT`/`EXPLAIN`/`SHOW`, in a server-side read-only session; `EXPLAIN ANALYZE` is refused. The untrusted statement is only ever executed inside a disposable, network-less container. Tests run every API simulator (cloud, Stripe, Slack, GitHub) against mock servers that record every request and fail on any non-GET, and every query sent to a real Postgres is asserted read-only.
 2. **Unknown is not safe.** `safe` is reachable only if a simulator matched, Tier 1 positively classified the action as benign, nothing is unverified, no tier errored, and it is reversible. Unknown command, operation, provider, unparseable SQL, unreachable remote, missing credentials, Docker missing: all `confirm` at best. Property tests and a golden corpus of dangerous inputs enforce this.
 3. **Local-first.** No telemetry, no uploads. Reports are written to `./.dryrun/reports/` (redacted). Secrets are masked in reports, cards, logs and errors; tests assert absence across stdout, stderr, JSON, saved files and SVG.
 4. **Action content is untrusted.** Commands, SQL and payloads are parsed, not executed, except in the sandbox. MCP output wraps the report in an `<dryrun_report untrusted_strings="true">` envelope and tells the agent that strings in it are data.
@@ -65,7 +78,7 @@ Dry Run **reports; it never executes.** The agent still runs the real action, af
 
 ## Showcases
 
-Run any with `dryrun demo <name>` (writes JSON, SVG and PNG cards to `./dryrun-demo-output/`).
+Run any with `dryrun demo <name>` or all with `dryrun demo all` (writes JSON, SVG and PNG cards to `./dryrun-demo-output/`). No accounts needed; `missing-where` and the sandbox part of `force-push` need Docker.
 
 | Demo | What happens | |
 |---|---|---|
@@ -110,10 +123,12 @@ Honest status: Railway and Vercel *classification* comes from public API names; 
 Defaults live in `dryrun.config.json` (all optional):
 
 ```json
-{ "thresholds": { "blockRows": 1000, "blockBytes": 1000000000, "blockMoney": 10000, "blockPeople": 1000, "confirmFiles": 10 },
-  "blockUnknownEnvIrreversible": true,
-  "productionHints": ["prod", "production", "live"] }
+{ "thresholds": { "blockRows": 1000, "blockBytes": 1000000000, "blockMoney": 10000, "blockPeople": 1000,
+                  "confirmRows": 1, "confirmFiles": 10, "confirmMoney": 1, "confirmRecipients": 50 },
+  "blockUnknownEnvIrreversible": true }
 ```
+
+Environment (production / staging / local / unknown) is inferred from evidence the simulator can see: names and tags containing `prod`/`production`/`live`, public domains and live traffic (cloud), the credential's mode (Stripe live vs test), protected/default branches (git). The report lists the evidence it used.
 
 `block`: irreversible + critical in production; irreversible data loss where the environment cannot be confirmed as non-production; irreversible over a threshold; catastrophic commands (`rm -rf /`, `~`, `dd` to a device). An invalid config is an error, never a silent fallback.
 
@@ -139,9 +154,11 @@ Create **read-only** credentials for Dry Run and never reuse the agent's write c
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Adding a provider is a JSON file plus a test.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Adding a provider is a JSON file plus a test. A wrong `safe` verdict is treated as a security bug: report it via [SECURITY.md](SECURITY.md). Design notes: [docs/DECISIONS.md](docs/DECISIONS.md), history: [CHANGELOG.md](CHANGELOG.md).
 
-## Limits (v1)
+## Status and limits (v0.1)
+
+Early release. The report schema (`schema_version: "0.1"`) may change before 1.0. Experimental: Railway/Vercel resolvers, AWS (classification only), email (Tier 1 only).
 
 Reports only; it never executes for the agent. Postgres only. Windows via WSL. Sandbox rehearsals are approximations (no network, different OS tools, sampled data), and reports say where. Not a replacement for backups, least-privilege tokens or branch protection.
 

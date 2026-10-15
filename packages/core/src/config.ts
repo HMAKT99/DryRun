@@ -20,8 +20,6 @@ export const ConfigSchema = z.object({
     .default({}),
   /** Block irreversible+data-bearing actions whose environment is unknown. */
   blockUnknownEnvIrreversible: z.boolean().default(true),
-  /** Hostnames/name fragments that always indicate production. */
-  productionHints: z.array(z.string()).default(["prod", "production", "live"]),
 });
 export type Config = z.infer<typeof ConfigSchema>;
 

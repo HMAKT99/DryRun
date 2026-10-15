@@ -81,9 +81,12 @@ function measure(dir: string, maxBytes: number, maxFiles: number): { bytes: numb
 }
 
 export function createDockerSandbox(): DockerSandbox {
-  const available = dockerAvailable() && imagePresent();
+  const daemon = dockerAvailable();
+  const image = daemon && imagePresent();
+  const available = daemon && image;
+  const reason = available ? undefined : !daemon ? "Docker daemon is not reachable (start Docker, or install it; Windows: use WSL2)" : `sandbox image ${SANDBOX_IMAGE} is not pulled (run: docker pull ${SANDBOX_IMAGE})`;
   return {
-    available,
+    available, reason,
     copyProject(srcDir, limits = {}) {
       const m = measure(srcDir, limits.maxBytes ?? 200e6, limits.maxFiles ?? 50_000);
       if (m.exceeded) return { error: `${m.exceeded} (copy limit); Tier 3 skipped` };

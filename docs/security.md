@@ -18,4 +18,4 @@ The action being rehearsed (command, SQL, API payload) and everything read back 
 - The SQL gate is a conservative allowlist, not a parser-proof; the server-side read-only session is the backstop. Do not point Dry Run at a role with more privileges than needed.
 - Resolvers for Railway/Vercel are unverified against live APIs.
 
-Report vulnerabilities privately to the maintainer. A wrong `safe` verdict is treated as a security bug.
+Report vulnerabilities privately; see [SECURITY.md](../SECURITY.md). A wrong `safe` verdict is treated as a security bug.

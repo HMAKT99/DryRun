@@ -58,7 +58,7 @@ export function createPostgresSimulator(opts: { pgFactory?: (url: string) => Rea
     async rehearse(a, sandbox: Sandbox) {
       const url = resolveDbUrl(a, opts.env);
       if (!url) throw new Error("no database URL to copy schema/data from");
-      if (!sandbox.available || !dockerAvailable()) throw new Error("Docker unavailable");
+      if (!sandbox.available || !dockerAvailable()) throw new Error(sandbox.reason ?? "Docker unavailable");
       return rehearsePg(url, sqlOf(a), mk);
     },
   };

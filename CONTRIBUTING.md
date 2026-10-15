@@ -1,7 +1,8 @@
 # Contributing
 
 ```bash
-npm install && npm run build && npm test     # needs Node 22+; Docker enables the sandbox tests
+docker pull alpine/git:latest && docker pull postgres:16-alpine   # optional: enables the sandbox/Postgres tests (skipped without Docker)
+npm install && npm run build && npm test     # needs Node 22+
 npm run bundle -w dry-run-agents             # builds the CLI/MCP bundle used by the e2e tests
 ```
 
@@ -21,3 +22,12 @@ Principles for any change: Dry Run never writes to a real system; unknown is nev
 
 ## Layout
 `core` (types, policy, redaction, guards, report/card) · `sim-*` (simulators) · `engine` (wiring, persistence, explain) · `mcp` · `cli` (`dry-run-agents`) · `demos` (mock providers + showcases).
+
+## Pull requests
+Keep changes small and tested. If you change a verdict rule or add a classification, add the dangerous inputs to the golden corpus in the relevant `test/` folder (a command that must never be `safe`). CI (`.github/workflows/ci.yml`) runs the full suite, including the Docker tests and `dryrun demo all`, on Ubuntu.
+
+## Regenerating the README recordings
+`docs/tapes/*.tape` are [vhs](https://github.com/charmbracelet/vhs) scripts: `npm run build && npm run bundle -w dry-run-agents && vhs docs/tapes/nine-second-deletion.tape`.
+
+## Reporting a wrong verdict
+A `safe` that should not be `safe` is a security bug: see [SECURITY.md](SECURITY.md). A `confirm` that should be `safe`, or a `block` that is too strict, is a normal issue.
