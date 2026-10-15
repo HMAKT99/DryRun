@@ -12,7 +12,7 @@ import { bold, colorReport, cyan, dim, exitCodeFor, green, red, yellow } from ".
 import { AGENTS, ConfigError, apply, diffText, launchFor, plan, type AgentId } from "./setup.js";
 import { doctor } from "./doctor.js";
 
-const program = new Command().name("dryrun").description("Rehearse any risky action before your agent does it. Never changes real systems.").version("0.1.0");
+const program = new Command().name("dryrun").description("Rehearse any risky action before your agent does it. Never changes real systems.").version(process.env["DRYRUN_VERSION"] ?? "dev");
 
 interface Common { json?: boolean; card?: string; cwd?: string; envHint?: string }
 const common = (c: Command) => c.option("--json", "print the Consequence Report as JSON").option("--card <file>", "write a shareable report card (.png or .svg)").option("--cwd <dir>", "working directory").option("--env-hint <name>", "tell Dry Run which environment this targets (e.g. production)");

@@ -1,10 +1,13 @@
 import { build } from "esbuild";
+import { readFileSync as rf } from "node:fs";
+const VERSION = JSON.parse(rf("package.json", "utf8")).version;
 import { cpSync, rmSync, mkdirSync, chmodSync } from "node:fs";
 rmSync("dist", { recursive: true, force: true }); mkdirSync("dist", { recursive: true });
 await build({
   entryPoints: ["src/main.ts"], outfile: "dist/dryrun.mjs", bundle: true, platform: "node", format: "esm", target: "node22",
   external: ["@resvg/resvg-js", "pg-native"],
   banner: { js: "#!/usr/bin/env node\nimport { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
+  define: { "process.env.DRYRUN_VERSION": JSON.stringify(VERSION) },
   logLevel: "info",
 });
 cpSync("../sim-cloud/catalog", "dist/catalog", { recursive: true });
