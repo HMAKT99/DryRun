@@ -1,6 +1,6 @@
 # Dry Run
 
-[![CI](https://github.com/HMAKT99/DryRun/actions/workflows/ci.yml/badge.svg)](https://github.com/HMAKT99/DryRun/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/dry-run-agents)](https://www.npmjs.com/package/dry-run-agents) [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![CI](https://github.com/HMAKT99/DryRun/actions/workflows/ci.yml/badge.svg)](https://github.com/HMAKT99/DryRun/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/dry-run-agents)](https://www.npmjs.com/package/dry-run-agents) [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![HMAKT99/DryRun MCP server](https://glama.ai/mcp/servers/HMAKT99/DryRun/badges/score.svg)](https://glama.ai/mcp/servers/HMAKT99/DryRun)
 
 **Rehearse anything before your agent does it.**
 
